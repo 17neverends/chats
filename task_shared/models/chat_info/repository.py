@@ -1,3 +1,4 @@
+from typing import Optional
 from task_shared.models.chat_info.schemas import (ChatInfoCreate,
                                                   ChatInfoUpdate)
 from bson import ObjectId
@@ -28,6 +29,19 @@ class ChatInfoRepository:
 
     async def get_all(self):
         cursor = self.collection.find({})
+        chat_infos = []
+        async for chat_info in cursor:
+            chat_infos.append(chat_info)
+        return chat_infos
+
+
+    async def get_all_by_user_id(self, user_id: Optional[str] = None):
+        query = {}
+        
+        if user_id:
+            query['user_id'] = user_id
+
+        cursor = self.collection.find(query)
         chat_infos = []
         async for chat_info in cursor:
             chat_infos.append(chat_info)

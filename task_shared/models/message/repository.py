@@ -32,7 +32,27 @@ class MessageRepository:
                       offset: Optional[int] = 0):
         cursor = self.collection.find({}).skip(offset)
 
-        if limit is not None:
+        if limit:
+            cursor = cursor.limit(limit)
+
+        messages = []
+        async for message in cursor:
+            messages.append(message)
+        return messages
+
+
+    async def get_all_by_chat_id(self,
+                                 chat_id: Optional[str] = None,
+                                 limit: Optional[int] = None,
+                                 offset: Optional[int] = 0):
+        query = {}
+        
+        if chat_id:
+            query['chat_id'] = chat_id
+
+        cursor = self.collection.find(query).skip(offset)
+
+        if limit:
             cursor = cursor.limit(limit)
 
         messages = []

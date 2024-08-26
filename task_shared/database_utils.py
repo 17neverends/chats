@@ -8,7 +8,6 @@ uri = f"mongodb://{HOST}:{PORT}"
 
 client = AsyncIOMotorClient(uri)
 
-
 async def get_database(database_name: str = DB_NAME):
     return client[database_name]
 
