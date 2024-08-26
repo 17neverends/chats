@@ -8,6 +8,8 @@ from task_shared.models.message.schemas import MessageCreate
 from api.v1.routes import router
 from contextlib import asynccontextmanager
 from task_shared.database_utils import get_collection
+from shared.bases.jwt_mananger import decode_access_token
+from app import logger
 
 message_repo = None
 
@@ -27,29 +29,32 @@ rooms: Dict[str, List[str]] = {}
 
 @socket_manager.on('connect')
 async def connect(sid, environ):
-    print(f"Client connected: {sid}")
+    logger.info(f"Client connected: {sid}")
 
 @socket_manager.on('disconnect')
 async def disconnect(sid):
-    print(f"Client disconnected: {sid}")
-    for room_name, clients in rooms.items():
+    logger.info(f"Client disconnected: {sid}")
+    for clients in rooms.values():
         if sid in clients:
             clients.remove(sid)
             break
 
 @socket_manager.on('join')
-async def join(sid, data):
+async def join(sid, data, token: str):
+    if not token:
+        return
+
+    decode_token = decode_access_token(token)
+    if not decode_token:
+        return
+
     room_name = data['room']
     if room_name not in rooms:
         rooms[room_name] = []
 
     if sid not in rooms[room_name]:
         rooms[room_name].append(sid)
-
-    messages = await message_repo.get_all(limit=50, offset=0)
-    messages = [msg for msg in messages if msg['room'] == room_name]
-
-    await socket_manager.emit('history', messages, room=sid)
+    logger.info(f"User {sid} joined the room {room_name}")
     await socket_manager.emit('message', {'text': f"User {sid} joined the room {room_name}"}, room=room_name)
 
 @socket_manager.on('leave')
@@ -61,22 +66,30 @@ async def leave(sid, data):
             await socket_manager.emit('message', {'text': f"User {sid} left the room {room_name}"}, room=room_name)
 
 @socket_manager.on('message')
-async def message(sid, data):
-    room_name = data['room']
-    message_text = data['message']
-    message_type = data.get('message_type', 'text')
-    timestamp = datetime.now()
+async def message(sid, data, token: str):
+    if not token:
+        logger.warning(f"User {sid} havent access token")
+        return
 
-    message_create = MessageCreate(
-        user_id=sid,
-        message=message_text,
-        message_type=message_type,
-        timestamp=timestamp,
-        room=room_name
-    )
-    saved_message = await message_repo.create(message_create)
+    decode_token = decode_access_token(token)
+    if decode_token:
+        room_name = data['room']
+        message_text = data['message']
+        message_type = data.get('message_type', 'text')
+        timestamp = datetime.now()
 
-    await socket_manager.emit('message', saved_message, room=room_name)
+        message_create = MessageCreate(
+            user_id=sid,
+            message=message_text,
+            message_type=message_type,
+            timestamp=timestamp,
+            room=room_name
+        )
+        saved_message = await message_repo.create(message_create)
+        logger.info(f"User {sid} sent a message: {message_text}")
+        await socket_manager.emit('message', saved_message, room=room_name)
+    logger.info(f"User {sid} havent bad access token")
+    return
 
 app.include_router(router)
 
