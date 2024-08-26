@@ -8,7 +8,7 @@ from task_shared.models.message.schemas import MessageCreate
 from api.v1.routes import router
 from contextlib import asynccontextmanager
 from task_shared.database_utils import get_collection
-from shared.bases.jwt_mananger import decode_access_token
+from shared.bases.jwt_manager import decode_access_token
 from app import logger
 
 message_repo = None
